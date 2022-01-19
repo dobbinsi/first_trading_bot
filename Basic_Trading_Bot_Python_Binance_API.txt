@@ -1,0 +1,208 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "116316d6",
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "80e37c6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from binance import Client"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "756599a7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fc2a147b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%run ./keys.ipynb"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a89a0e77",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "client = Client(api_key,secret_key, tld=\"us\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cd6c3504",
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "client.get_account()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c6f9888e",
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(client.get_historical_klines('BTCUSDT', '1m', '30 min ago EST'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b12e1739",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def getminutedata(symbol, interval, lookback):\n",
+    "    frame = pd.DataFrame(client.get_historical_klines(symbol, interval, lookback + 'min ago UTC'))\n",
+    "    frame = frame.iloc[:,:6]\n",
+    "    frame.columns = ['Time', 'Open', 'High', 'Low', 'Close', 'Volume']\n",
+    "    frame = frame.set_index('Time')\n",
+    "    frame.index = pd.to_datetime(frame.index, unit='ms')\n",
+    "    frame = frame.astype(float)\n",
+    "    return frame"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4b15f631",
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "getminutedata('ADAUSD', '1m', '10')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "693ba02e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test = getminutedata('ADAUSD', '1m', '10')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c39ec201",
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "test.Open.plot()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b6db1685",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# buy if asset rises by more than 1% within the last 10 min\n",
+    "# sell if asset rises by more than 0.5% or falls further by 0.5%"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "130ead1e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def strategytest(symbol, qty, openTrade=False):\n",
+    "    df = getminutedata(symbol, '1m', '10')\n",
+    "    cumreturns = (df.Open.pct_change() +1).cumprod() -1\n",
+    "    if not openTrade:\n",
+    "        if cumreturns[-1] > 0.01:\n",
+    "            order = client.create_order(symbol=symbol, side='BUY', type='MARKET', quantity=qty)\n",
+    "            print(order)\n",
+    "            openTrade=True\n",
+    "        else:\n",
+    "            print('no trade yet')\n",
+    "    if openTrade:\n",
+    "        while True:\n",
+    "            df = getminutedata(symbol, '1m', '10')\n",
+    "            sincebuy = df.loc[df.index > pd.to_datetime(order['transactTime'], unit='ms')]\n",
+    "            if len(sincebuy) > 0:\n",
+    "                sincebuyRet = (sincebuy.Open.pct_change() +1).cumprod() -1\n",
+    "                if sincebuyRet[-1] > 0.005 or sincebuyRet[-1] < -0.005:\n",
+    "                    order = client.create_order(symbol=symbol, side='SELL', type='MARKET', quantity=qty)\n",
+    "            print(order)\n",
+    "            break"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a41a7ae1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "strategytest('ADAUSD', 10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "11916708",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
